@@ -3,7 +3,7 @@ from typing import List, Tuple, Dict, Optional, Any, Callable
 from dataclasses import dataclass
 import logging
 
-from dash_dashboard.BaseClasses import BasePageLayout, BaseMain, BaseSideBar, PageInteractiveComponents, \
+from dash_dashboard.base_classes import BasePageLayout, BaseMain, BaseSideBar, PageInteractiveComponents, \
     CommonInputCallbacks
 import dash_dashboard.component_defaults as c
 import dash_html_components as html
@@ -104,5 +104,6 @@ def callbacks(app):
 
 
 if __name__ == '__main__':
-    from dash_dashboard.BaseClasses import test_page
+    from dash_dashboard.app import test_page
+
     test_page(layout=layout, callbacks=callbacks)

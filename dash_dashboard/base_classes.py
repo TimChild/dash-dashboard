@@ -7,7 +7,7 @@ from deprecation import deprecated
 from dataclasses import dataclass
 from dash_extensions.enrich import Input, Output, State
 import threading
-from typing import Optional, List, Union, Callable, Tuple, Type
+from typing import Optional, List, Union, Callable, Tuple
 import abc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
@@ -445,17 +445,3 @@ class BaseSideBar(BaseDashRequirements):
         return ret
 
 
-def test_page(layout: Callable, callbacks: Callable):
-    """
-    Makes a Dash app and runs loads layout and callbacks from layout_class in a similar way to how
-    the PageCollection will when added in main app
-    """
-    from dash_extensions.enrich import DashProxy
-    app = DashProxy(
-        transforms=[
-        ],
-        name=__name__, external_stylesheets=[dbc.themes.BOOTSTRAP]
-    )
-    app.layout = layout
-    callbacks(app)
-    app.run_server(port=8090, debug=True)
