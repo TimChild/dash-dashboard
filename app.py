@@ -7,12 +7,9 @@ import dash_core_components as dcc
 from dash_extensions.multipage import PageCollection, Page, module_to_page
 
 # REQUIRES INPUT: Import all pages for app here
-# import src.Dash.pages.TestingPage as TestPage
-# import src.Dash.pages.TestingPage2 as TestPage2
 import src.Dash.pages.TemplatePage as TemplatePage
 
 # REQUIRES INPUT: Put all pages here
-# pages = [TestPage, TestPage2, TemplatePage]
 pages = [TemplatePage]
 
 

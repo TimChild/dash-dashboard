@@ -17,11 +17,11 @@ from dash_extensions.multipage import PageCollection
 import dash
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 CALLBACK_TYPE = Tuple[str, str]  # All Inputs/Outputs/States/Triggers require (<id>, <target>)
 LAYOUT_TYPE = Union[dbc.Container, html.Div, dbc.Row, dbc.Col, dbc.Card]
-
 
 # e.g. ('button-test', 'n_clicks')
 
