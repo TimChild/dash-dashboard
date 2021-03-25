@@ -20,21 +20,44 @@ class Components(PageInteractiveComponents):
     def __init__(self):
         super().__init__()
         self.inp_example = c.input_box(id_name='inp-exmaple', val_type='text', debounce=False,
-                                               placeholder='Example Input', persistence=False)
+                                       placeholder='Example Input', persistence=False)
         self.div_example = c.div(id_name='div-example')
 
 
 # A reminder that this is helpful for making many callbacks which have similar inputs
 class CommonCallback(CommonInputCallbacks):
-    def __init__(self):
+    components = Components()  # Only use this for accessing IDs only... DON'T MODIFY
+
+    def __init__(self, example):
         super().__init__()  # Just here to shut up PyCharm
+        self.example_value = example
         pass
 
     def callback_names_funcs(self):
-        return {}
+        """
+        Return a dict of {<name>: <callback_func>}
+        """
+        return {
+            "example": self.example_func(),
+        }
+
+    def example_func(self):
+        """Part of example, can be deleted"""
+        return self.example_value
+
+    @classmethod
+    def get_inputs(cls) -> List[Tuple[str, str]]:
+        return [
+            (cls.components.inp_example.id, 'value'),
+        ]
+
+    @classmethod
+    def get_states(cls) -> List[Tuple[str, str]]:
+        return []
 
 
 class TemplateLayout(BasePageLayout):
+    top_bar_title = 'Title -- May want to override in PageLayout override'
 
     # Defining __init__ only for typing purposes (i.e. to specify page specific Components as type for self.components)
     def __init__(self, components: Components):
@@ -63,12 +86,9 @@ class TemplateMain(BaseMain):
         return lyt
 
     def set_callbacks(self):
-        self.make_callback(inputs=[
+        self.make_callback(outputs=(self.components.div_example.id, 'children'), inputs=[
             (self.components.inp_example.id, 'value'),
-        ],
-            outputs=(self.components.div_example.id, 'children'),
-            func=lambda text: text,
-        )
+        ], func=lambda text: text)
 
 
 class TemplateSidebar(BaseSideBar):

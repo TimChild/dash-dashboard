@@ -19,7 +19,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-CALLBACK_TYPE = Tuple[str, str]  # All Inputs/Outputs/States/Triggers require (<id>, <target>)
+CALLBACK_TYPE = Tuple[str, str]  # All Inputs/Outputs/States require (<id>, <target>)
 LAYOUT_TYPE = Union[dbc.Container, html.Div, dbc.Row, dbc.Col, dbc.Card]
 
 # e.g. ('button-test', 'n_clicks')
@@ -84,8 +84,19 @@ class PendingCallbacks(list):
 class CallbackInfo:
     func: Callable
     outputs: Union[List[Output], Output]
-    inputs: Optional[Union[List[Input], Input]]
+    inputs: Union[List[Input], Input]
     states: Optional[Union[List[State], State]]
+
+    def __post_init__(self):
+        if isinstance(self.outputs, Output):
+            self.outputs = [self.outputs]
+        if isinstance(self.inputs, Input):
+            self.inputs = [self.inputs]
+        if isinstance(self.states, State):
+            self.states = [self.states]
+
+        if self.states is None:
+            self.states = []
 
 
 class BaseDashRequirements(abc.ABC):
@@ -110,11 +121,9 @@ class BaseDashRequirements(abc.ABC):
         """
         raise NotImplementedError
 
-    def make_callback(self, inputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
-                      outputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
-                      func: Callable = None,
-                      states: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
-                      triggers: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None):
+    def make_callback(self, outputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
+                      inputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None, func: Callable = None,
+                      states: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None):
 
         """
         Helper function for attaching callbacks more easily
@@ -124,27 +133,15 @@ class BaseDashRequirements(abc.ABC):
             outputs (List[CALLBACK_TYPE]): Similar, (<id>, <property>)
             states (List[CALLBACK_TYPE]): Similar, (<id>, <property>)
             func (Callable): The function to wrap with the callback (make sure it takes the right number of inputs in order and returns the right number of outputs in order)
-            triggers (): Triggers callback but is not passed to function
 
         Returns:
 
         """
+        if inputs is None:
+            raise ValueError(f"Can't have no inputs... "
+                             f"\n{inputs, outputs, states}")
 
-        def ensure_list(val) -> List[CALLBACK_TYPE]:
-            if isinstance(val, tuple):
-                return [val]
-            elif val is None:
-                return []
-            elif isinstance(val, list):
-                return val
-            else:
-                raise TypeError(f'{val} is not valid')
-
-        if inputs is None and triggers is None:
-            raise ValueError(f"Can't have both inputs and triggers set as None... "
-                             f"\n{inputs, triggers, outputs, states}")
-
-        inputs, outputs, states, triggers = [ensure_list(v) for v in [inputs, outputs, states, triggers]]
+        inputs, outputs, states = [ensure_list(v) for v in [inputs, outputs, states]]
 
         Inputs = [Input(*inp) for inp in inputs]
         Outputs = [Output(*out) for out in outputs]
@@ -231,12 +228,13 @@ class BasePageLayout(BaseDashRequirements):
         if self.page_collection is not None:
             layout = dbc.NavbarSimple(
                 [dbc.NavItem(dbc.NavLink(page.label, href=page.id)) for page in self.page_collection.pages],
-                brand=self.top_bar_title(),
+                brand=self.top_bar_title,
                 )
         else:
-            layout = dbc.NavbarSimple('No pagecollection passed', brand=self.top_bar_title())
+            layout = dbc.NavbarSimple('No pagecollection passed', brand=self.top_bar_title)
         return layout
 
+    @property
     @abc.abstractmethod
     def top_bar_title(self) -> str:
         """override to return a title to show in the top navbar"""
@@ -280,8 +278,7 @@ class BasePageLayout(BaseDashRequirements):
         self.components.dd_main.options = [{'label': label, 'value': label} for label in labels]
         self.components.dd_main.value = labels[0]
         # Then make callback
-        self.make_callback(inputs=(self.components.dd_main.id, 'value'),
-                           outputs=[(id_, 'hidden') for id_ in labels],
+        self.make_callback(outputs=[(id_, 'hidden') for id_ in labels], inputs=(self.components.dd_main.id, 'value'),
                            func=_main_dd_callback_func())
 
     def run_all_callbacks(self, app: dash.Dash):
@@ -289,11 +286,18 @@ class BasePageLayout(BaseDashRequirements):
         self.set_callbacks()
         self.sidebar.set_callbacks()
         all_callbacks = self.pending_callbacks + self.sidebar.pending_callbacks
+        if (p := self.components.pending_callbacks) is not None:
+            all_callbacks.extend(p)
+        else:
+            logger.warning(f'No pending_callbacks for page Components. {p}')
+
         for main in self.mains:
             main.set_callbacks()
             all_callbacks.extend(main.pending_callbacks)
 
         for callback in all_callbacks:
+            if any([not isinstance(v, list) for v in [callback.inputs, callback.outputs, callback.states]]):
+                raise RuntimeError(f'Callback contains non list: {callback}')
             app.callback(*callback.inputs, *callback.outputs, *callback.states)(callback.func)
 
 
@@ -332,7 +336,13 @@ class PageInteractiveComponents(abc.ABC):
 
     Intention is to subclass this for each page.
     """
-    def __init__(self):
+    def __init__(self, pending_callbacks: Optional[PendingCallbacks] = None):
+        """
+        Args:
+            pending_callbacks (): Necessary for layout items which include built in callbacks within them (e.g.
+                downloading figure buttons)
+        """
+        self.pending_callbacks = pending_callbacks
         self.dd_main = dcc.Dropdown(id='dd-main')
 
 
@@ -342,6 +352,13 @@ class CommonInputCallbacks(abc.ABC):
     Examples:
         Several figures on a page which show different things, but all based on the save 5 inputs.
 
+        # In set_callbacks of Main/Sidebar etc
+        self.make_callback(
+            outputs = [(<output_id_1>, <output_target>), (<output_id_2>, <output_target_2>)]  # target e.g. 'children'
+            inputs = CommonInputCallbacks.get_inputs(),
+            states = CommonInputCallbacks.get_states(),
+            func = CommonInputCallbacks.get_callback_func('func_a'),  # 'func_a' defined in callback_names_funcs
+        )
     """
     @abc.abstractmethod
     def __init__(self, *args):
@@ -372,7 +389,23 @@ class CommonInputCallbacks(abc.ABC):
         pass
 
     @classmethod
-    def get_callback(cls, callback_name: str):
+    @abc.abstractmethod
+    def get_inputs(cls) -> List[Tuple[str, str]]:
+        """Override to return the list of common Inputs that can be used in callbacks
+        Note: List of Tuples of (id, value)  e.g. ('inp-number', 'value')
+        """
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def get_states(cls) -> List[Tuple[str, str]]:
+        """Override to return the list of common States that can be used in callbacks
+        Note: List of Tuples of (id, value)  e.g. ('inp-number', 'value')
+        """
+        pass
+
+    @classmethod
+    def get_callback_func(cls, callback_name: str):
         """Generates a callback function which takes all arguments that __init__ takes and will do whatever
         the corresponding function is for "callback_name" in self.callback_names_funcs"""
         def callback_func(*args):
@@ -445,3 +478,12 @@ class BaseSideBar(BaseDashRequirements):
         return ret
 
 
+def ensure_list(val) -> List[CALLBACK_TYPE]:
+    if isinstance(val, tuple):
+        return [val]
+    elif val is None:
+        return []
+    elif isinstance(val, list):
+        return val
+    else:
+        raise TypeError(f'{val} is not valid')
