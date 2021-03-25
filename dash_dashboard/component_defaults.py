@@ -13,7 +13,7 @@ from dash_extensions import Download
 from dash_extensions.snippets import send_file
 from plotly import graph_objects as go
 
-from dash_dashboard.BaseClasses import CallbackInfo
+from BaseClasses import CallbackInfo
 
 
 def input_box(id_name: Optional[str] = None, val_type='number', debounce=True,

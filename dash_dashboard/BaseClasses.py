@@ -12,7 +12,6 @@ import abc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 import dash_core_components as dcc
-from dash_extensions.enrich import Trigger
 from dash_extensions.multipage import PageCollection
 import dash
 import logging
@@ -87,7 +86,6 @@ class CallbackInfo:
     outputs: Union[List[Output], Output]
     inputs: Optional[Union[List[Input], Input]]
     states: Optional[Union[List[State], State]]
-    triggers: Optional[Union[List[Trigger], Trigger]]
 
 
 class BaseDashRequirements(abc.ABC):
@@ -151,9 +149,8 @@ class BaseDashRequirements(abc.ABC):
         Inputs = [Input(*inp) for inp in inputs]
         Outputs = [Output(*out) for out in outputs]
         States = [State(*s) for s in states]
-        Triggers = [Trigger(*t) for t in triggers]
 
-        callback_info = CallbackInfo(func=func, outputs=Outputs, inputs=Inputs, states=States, triggers=Triggers)
+        callback_info = CallbackInfo(func=func, outputs=Outputs, inputs=Inputs, states=States)
         self.pending_callbacks.append(callback_info)
 
 
@@ -297,7 +294,7 @@ class BasePageLayout(BaseDashRequirements):
             all_callbacks.extend(main.pending_callbacks)
 
         for callback in all_callbacks:
-            app.callback(*callback.inputs, *callback.outputs, *callback.states, *callback.triggers)(callback.func)
+            app.callback(*callback.inputs, *callback.outputs, *callback.states)(callback.func)
 
 
 class BaseMain(BaseDashRequirements):
@@ -453,13 +450,12 @@ def test_page(layout: Callable, callbacks: Callable):
     Makes a Dash app and runs loads layout and callbacks from layout_class in a similar way to how
     the PageCollection will when added in main app
     """
-    from dash_extensions.enrich import DashProxy, TriggerTransform
+    from dash_extensions.enrich import DashProxy
     app = DashProxy(
         transforms=[
-            TriggerTransform(),
         ],
         name=__name__, external_stylesheets=[dbc.themes.BOOTSTRAP]
     )
     app.layout = layout
     callbacks(app)
-    app.run_server(port=8056, debug=True)
+    app.run_server(port=8090, debug=True)
