@@ -131,6 +131,7 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         """https://pypi.org/project/dash-extensions/"""
 
         def make_file(n_clicks, fig: dict, filename: str):
+            import base64
             if n_clicks:
                 fig = go.Figure(fig)
                 if not filename:
@@ -139,20 +140,23 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
                         filename = 'DashFigure'
 
                 fname = filename + f'.{file_type}'
-                bytes_ = False
+
                 if file_type == 'html':
                     data = fig.to_html()
                     mtype = 'text/html'
+                    b64 = False
                 elif file_type == 'jpg':
-                    fig.write_image('temp/dash_temp.jpg', format='jpg')
-                    return send_file('temp/dash_temp.jpg', filename=fname, mime_type='image/jpg')
+                    data = base64.b64encode(fig.to_image(format='jpg')).decode()
+                    mtype = 'image/jpg'
+                    b64 = True
                 elif file_type == 'svg':
-                    fig.write_image('temp/dash_temp.svg', format='svg')
-                    return send_file('temp/dash_temp.svg', fname, 'image/svg+xml')
+                    data = base64.b64encode(fig.to_image(format='svg')).decode()
+                    mtype = 'image/svg+xml'
+                    b64 = True
                 else:
                     raise ValueError(f'{file_type} not supported')
 
-                return dict(content=data, filename=fname, mimetype=mtype, byte=bytes_)
+                return dict(content=data, filename=fname, mimetype=mtype, base64=b64)
             else:
                 raise PreventUpdate
 
@@ -185,7 +189,7 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         ], justify='between')
     )
 
-    graph_body = dcc.Graph(id=id_name, figure=None)
+    graph_body = dcc.Graph(id=id_name)
     graph = dbc.Card([
         header_layout, graph_body
     ])

@@ -50,7 +50,7 @@ if __name__ == '__main__':
     pass
 
 
-def test_page(layout: Callable, callbacks: Callable, single_threaded=False):
+def test_page(layout: Callable, callbacks: Callable, single_threaded=False, port=8050):
     """
     Makes a Dash app and runs loads layout and callbacks from layout_class in a similar way to how
     the PageCollection will when added in main app
@@ -64,4 +64,4 @@ def test_page(layout: Callable, callbacks: Callable, single_threaded=False):
 
     app.layout = layout
     callbacks(app)
-    app.run_server(port=8050, debug=True, threaded=not single_threaded)
+    app.run_server(port=port, debug=True, threaded=not single_threaded)
