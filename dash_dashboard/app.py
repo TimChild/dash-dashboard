@@ -2,7 +2,7 @@ import logging
 # logging.basicConfig(level=logging.DEBUG)
 from typing import Callable
 
-from dash_extensions.enrich import DashProxy
+from dash_extensions.enrich import DashProxy, ServersideOutputTransform
 import dash_bootstrap_components as dbc
 import dash_html_components as html
 import dash_core_components as dcc
@@ -31,7 +31,7 @@ def get_app(pages) -> DashProxy:
 
     # Create app.
     app = DashProxy(name=__name__, suppress_callback_exceptions=False, external_stylesheets=[dbc.themes.BOOTSTRAP],
-                    transforms=[])
+                    transforms=[ServersideOutputTransform()])
     app.layout = html.Div([default_layout()])
 
     # Register callbacks.
@@ -55,9 +55,9 @@ def test_page(layout: Callable, callbacks: Callable, single_threaded=False, port
     Makes a Dash app and runs loads layout and callbacks from layout_class in a similar way to how
     the PageCollection will when added in main app
     """
-    from dash_extensions.enrich import DashProxy
     app = DashProxy(
         transforms=[
+            ServersideOutputTransform()
         ],
         name=__name__, external_stylesheets=[dbc.themes.BOOTSTRAP]
     )
@@ -65,3 +65,4 @@ def test_page(layout: Callable, callbacks: Callable, single_threaded=False, port
     app.layout = layout
     callbacks(app)
     app.run_server(port=port, debug=True, threaded=not single_threaded)
+

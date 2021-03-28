@@ -10,18 +10,19 @@
 .below-header {
   top: 60px;
   position: fixed;
-  padding-right: 20%;
+  padding-right: 25%;
   padding-left: 0;
   height: calc(100% - 50px);
 }
 
 .sidebar {
   height: 100%;
-  width: 20%;
+  width: 25%;
   position: absolute;
   top: 0;
   right: 0;
   overflow-y: auto;
+  padding-bottom: 50px;
 }
 
 .content-area {

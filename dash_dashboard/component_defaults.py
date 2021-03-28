@@ -1,4 +1,5 @@
 from __future__ import annotations
+import abc
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
@@ -12,8 +13,87 @@ from dash.exceptions import PreventUpdate
 from dash_extensions import Download
 from dash_extensions.snippets import send_file
 from plotly import graph_objects as go
+from dash_dashboard.base_classes import CallbackInfo, PendingCallbacks, CALLBACK_TYPE
 
-from dash_dashboard.base_classes import CallbackInfo, PendingCallbacks
+
+class SetupCallbackTemplate(abc.ABC):
+    @abc.abstractmethod
+    def __init__(self, *args):
+        pass
+
+    @staticmethod
+    @abc.abstractmethod
+    def get_outputs(id_name: str) -> Union[List[CALLBACK_TYPE], CALLBACK_TYPE]:
+        pass
+
+    @classmethod
+    @abc.abstractmethod
+    def get_inputs(cls, *args) -> Union[List[CALLBACK_TYPE], CALLBACK_TYPE]:
+        """Override to return the Inputs that will trigger the callback (these go first in __init__ args"""
+        pass
+
+    @classmethod
+    def get_states(cls, *args) -> Union[List[CALLBACK_TYPE], CALLBACK_TYPE]:
+        """Override to return the States for the callback (these go after Inputs in __init__ args"""
+        return []
+
+    @abc.abstractmethod
+    def callback_return(self):
+        """Override this to return the list of values which match self.get_outputs"""
+        pass
+
+    @classmethod
+    def get_callback_func(cls):
+        """Generates a callback function which takes all arguments that __init__ takes"""
+        def callback_func(*args):
+            inst = cls(*args)
+            return inst.callback_return()
+        return callback_func
+
+
+class RangeSliderSetupCallback(SetupCallbackTemplate, abc.ABC):
+    # noinspection PyMissingConstructor
+    def __init__(self, min: float, max: float, step: float,
+                 marks: Dict[float, str],
+                 value: Tuple[float]):
+        self.min = min
+        self.max = max
+        self.step = step
+        self.marks = marks
+        self.value = value
+
+    @staticmethod
+    def get_outputs(id_name: str) -> Union[List[CALLBACK_TYPE], CALLBACK_TYPE]:
+        return [
+            (id_name, 'min'),
+            (id_name, 'max'),
+            (id_name, 'step'),
+            (id_name, 'marks'),
+            (id_name, 'value'),
+        ]
+
+    def callback_return(self):
+        return self.min, self.max, self.step, self.marks, self.value
+
+
+def space(height: Optional[str] = None, width: Optional[str] = None) -> html.Div:
+    """Just for adding a blank div which takes up some space"""
+    return html.Div(style={f'height': height, 'width': width})
+
+
+def store(id_name: str, storage_type: str = 'memory', serverside=True) -> Union[dcc.Store, ServerStore]:
+    """For storing data only on clientside (or serverside if used with ServersideOutput from dash-extensions)
+
+    Usual Callback Format:
+        'data': Json serializable for clientside, Any for serverside
+        'clear_data': set True to clear data
+
+    Args:
+        id_name:
+        storage_type: 'memory' = resets on page refresh, 'session' = resets on browser reload, 'local' = local memory
+
+    """
+    return dcc.Store(id=id_name, storage_type=storage_type)
 
 
 def input_box(id_name: Optional[str] = None, val_type='number', debounce=True,
@@ -39,6 +119,21 @@ def input_box(id_name: Optional[str] = None, val_type='number', debounce=True,
 
 def dropdown(id_name: str, multi=False, placeholder='Select',
              persistence=False) -> Union[dbc.Select, dcc.Dropdown]:
+    """
+    Either a single select or multi selectable dropdown.
+
+    Usual callbacks format:
+        'options': [{'label': <name>, 'value', <val>}]
+
+    Args:
+        id_name ():
+        multi ():  Whether multiple selections can be made
+        placeholder ():
+        persistence ():
+
+    Returns:
+
+    """
     if multi is False:
         dd = dbc.Select(id=id_name, placeholder=placeholder, persistence=persistence,
                         persistence_type='local')
@@ -56,7 +151,12 @@ def toggle(id_name: str, persistence=False) -> dbc.Checklist:
 
 def slider(id_name: str, updatemode='mouseup', persistence=False) -> dcc.Slider:
     return dcc.Slider(id=id_name, updatemode=updatemode, persistence=persistence,
-                        persistence_type='local')
+                      persistence_type='local')
+
+
+def range_slider(id_name: str, updatemode='mouseup', persistence=False) -> dcc.RangeSlider:
+    return dcc.RangeSlider(id=id_name, updatemode=updatemode,
+                           persistence=persistence, persistence_type='local')
 
 
 def checklist(id_name: str,
@@ -70,7 +170,21 @@ def checklist(id_name: str,
 
 def table(id_name: str, dataframe: Optional[pd.Dataframe] = None,
           **kwargs) -> dbc.Table:
-    """https://dash.plotly.com/datatable"""
+    """
+    https://dash.plotly.com/datatable
+
+    Usual callbacks format:
+        'columns': List[{"name": name, "id": name} for name in df.columns]
+        'data': df.to_dict('records')
+
+    Args:
+        id_name ():
+        dataframe ():
+        **kwargs ():
+
+    Returns:
+
+    """
     # table = dbc.Table(dataframe, id=self.id(id_name), striped=True, bordered=True, hover=True)
     if dataframe is not None:
         cols = [{'name': n, 'id': n} for n in dataframe.columns()]
@@ -87,8 +201,23 @@ def button(id_name: str, text: str, color='secondary') -> dbc.Button:
 
 
 def div(id_name: str, **kwargs) -> html.Div:
-    div = html.Div(id=id_name, **kwargs)
-    return div
+    d = html.Div(id=id_name, **kwargs)
+    return d
+
+
+def collapse(id_name: str) -> dbc.Collapse:
+    """
+    Usual callbacks format:
+        'is_open': bool
+
+    Args:
+        id_name ():
+
+    Returns:
+
+    """
+    c = dbc.Collapse(id=id_name)
+    return c
 
 
 def date_picker_single(id_name: str, **kwargs) -> dcc.DatePickerSingle:
@@ -113,6 +242,7 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
             (instead of the usual self.id which in this case would refer to the Card object)
 
     """
+
     def _graph_save_options(graph_id):
         layout = dbc.Row([
             dbc.Col(_download_button(graph_id, 'html'), width='auto'),
@@ -198,5 +328,3 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         pending_callbacks.extend(callback_infos)
     graph.graph_id = id_name  # So that it is easy to get to the graphs id through the returned card
     return graph
-
-

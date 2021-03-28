@@ -25,13 +25,6 @@ LAYOUT_TYPE = Union[dbc.Container, html.Div, dbc.Row, dbc.Col, dbc.Card]
 # e.g. ('button-test', 'n_clicks')
 
 
-def get_trig_id(ctx=None) -> str:
-    """Pass in dash.callback_context to get the id of the trigger returned"""
-    if ctx is None:
-        ctx = dash.callback_context
-    return ctx.triggered[0]['prop_id'].split('.')[0]
-
-
 @deprecated(details='Think I should always avoid using this in order to achieve a stateless backend')
 class EnforceSingleton:
     """Simplified from https://www.reddit.com/r/Python/comments/2qkwgh/class_to_enforce_singleton_pattern_on_subclasses/
@@ -86,6 +79,7 @@ class CallbackInfo:
     outputs: Union[List[Output], Output]
     inputs: Union[List[Input], Input]
     states: Optional[Union[List[State], State]]
+    serverside_outputs: Optional[Union[List[Output], Output]]
 
     def __post_init__(self):
         if isinstance(self.outputs, Output):
@@ -94,9 +88,13 @@ class CallbackInfo:
             self.inputs = [self.inputs]
         if isinstance(self.states, State):
             self.states = [self.states]
+        if isinstance(self.serverside_outputs, Output):
+            self.serverside_outputs = [self.serverside_outputs]
 
         if self.states is None:
             self.states = []
+        if self.serverside_outputs is None:
+            self.serverside_outputs = []
 
 
 class BaseDashRequirements(abc.ABC):
@@ -122,8 +120,11 @@ class BaseDashRequirements(abc.ABC):
         raise NotImplementedError
 
     def make_callback(self, outputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
-                      inputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None, func: Callable = None,
-                      states: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None):
+                      inputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
+                      func: Callable = None,
+                      states: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
+                      serverside_outputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
+                      ):
 
         """
         Helper function for attaching callbacks more easily
@@ -133,6 +134,8 @@ class BaseDashRequirements(abc.ABC):
             outputs (List[CALLBACK_TYPE]): Similar, (<id>, <property>)
             states (List[CALLBACK_TYPE]): Similar, (<id>, <property>)
             func (Callable): The function to wrap with the callback (make sure it takes the right number of inputs in order and returns the right number of outputs in order)
+            serverside_outputs: Same as outputs except results stay on server (i.e. place to store data temporarily)
+                Note: no limits on object type when using serverside outputs
 
         Returns:
 
@@ -147,7 +150,7 @@ class BaseDashRequirements(abc.ABC):
         Outputs = [Output(*out) for out in outputs]
         States = [State(*s) for s in states]
 
-        callback_info = CallbackInfo(func=func, outputs=Outputs, inputs=Inputs, states=States)
+        callback_info = CallbackInfo(func=func, outputs=Outputs, inputs=Inputs, states=States, serverside_outputs=serverside_outputs)
         self.pending_callbacks.append(callback_info)
 
 
@@ -298,7 +301,10 @@ class BasePageLayout(BaseDashRequirements):
         for callback in all_callbacks:
             if any([not isinstance(v, list) for v in [callback.inputs, callback.outputs, callback.states]]):
                 raise RuntimeError(f'Callback contains non list: {callback}')
-            app.callback(*callback.inputs, *callback.outputs, *callback.states)(callback.func)
+            app.callback(*callback.inputs,
+                         *callback.outputs,
+                         *callback.states,
+                         *callback.serverside_outputs)(callback.func)
 
 
 class BaseMain(BaseDashRequirements):
@@ -373,21 +379,6 @@ class CommonInputCallbacks(abc.ABC):
         """
         pass
 
-    @abc.abstractmethod
-    def callback_names_funcs(self):
-        """Override to return a dict of {<name>: <callback_func>}
-        Examples:
-            return {
-                        'func_a': self.do_func_a(),
-                        'func_b': self.do_func_b(),
-                    }
-
-            where self.do_func_a() is:
-            def do_func_a():
-                return self.a*self.b*self.c, self.d  # i.e. two outputs in this example
-        """
-        pass
-
     @classmethod
     @abc.abstractmethod
     def get_inputs(cls) -> List[Tuple[str, str]]:
@@ -401,6 +392,21 @@ class CommonInputCallbacks(abc.ABC):
     def get_states(cls) -> List[Tuple[str, str]]:
         """Override to return the list of common States that can be used in callbacks
         Note: List of Tuples of (id, value)  e.g. ('inp-number', 'value')
+        """
+        pass
+
+    @abc.abstractmethod
+    def callback_names_funcs(self):
+        """Override to return a dict of {<name>: <callback_func>}
+        Examples:
+            return {
+                        'func_a': self.do_func_a(),
+                        'func_b': self.do_func_b(),
+                    }
+
+            where self.do_func_a() is:
+            def do_func_a():
+                return self.a*self.b*self.c, self.d  # i.e. two outputs in this example
         """
         pass
 
