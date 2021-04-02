@@ -1,0 +1,31 @@
+.header-bar {
+  height: 60px;
+  position: fixed;
+  top: 0px;
+  margin: 0px;
+  padding: 0;
+  width: 100%;
+}
+
+.below-header {
+  top: 60px;
+  position: fixed;
+  padding-right: 20%;
+  padding-left: 0;
+  height: calc(100% - 50px);
+}
+
+.sidebar {
+  height: 100%;
+  width: 20%;
+  position: absolute;
+  top: 0;
+  right: 0;
+  overflow-y: auto;
+}
+
+.content-area {
+  overflow-y: auto;
+  height: 100%;
+  padding-bottom: 50px;
+}

@@ -150,6 +150,16 @@ def toggle(id_name: str, persistence=False) -> dbc.Checklist:
 
 
 def slider(id_name: str, updatemode='mouseup', persistence=False) -> dcc.Slider:
+    """
+
+    Args:
+        id_name ():
+        updatemode (): 'mouseup' or 'drag'
+        persistence ():
+
+    Returns:
+
+    """
     return dcc.Slider(id=id_name, updatemode=updatemode, persistence=persistence,
                       persistence_type='local')
 
@@ -195,9 +205,27 @@ def table(id_name: str, dataframe: Optional[pd.Dataframe] = None,
     return table_component
 
 
-def button(id_name: str, text: str, color='secondary') -> dbc.Button:
-    """Note: text is just children of Button"""
-    return dbc.Button(text, id=id_name, color=color)
+def button(id_name: str, text: str, color='secondary', spinner: Optional[dbc.Spinner] = None) -> dbc.Button:
+    """
+    Makes a button which shows <text> and if <spinner> is passed will also show a loading spinner
+
+    Note: If using a spinner, remember to put the item you want to wait for in the children of spinner
+    (i.e. an empty div that waits for an update)
+
+    Args:
+        id_name ():
+        text ():
+        color ():
+        spinner ():
+
+    Returns:
+
+    """
+    if spinner:
+        children = [spinner, text]
+    else:
+        children = text
+    return dbc.Button(children, id=id_name, color=color)
 
 
 def div(id_name: str, **kwargs) -> html.Div:
@@ -312,9 +340,10 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         name = dbc.Input(id=f'{graph_id}_inp-download-name', type='text', placeholder='Download Name')
         return name
 
+    header_id = f'h3-{id_name}'
     header_layout = dbc.CardHeader(
         dbc.Row([
-            dbc.Col(html.H3(graph_header), width='auto'),
+            dbc.Col(html.H3(id=header_id, children=graph_header), width='auto'),
             _graph_save_options(id_name),
         ], justify='between')
     )
@@ -327,4 +356,5 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         callback_infos = _get_graph_callbacks(id_name)  # ALl the callbacks for downloading the graph
         pending_callbacks.extend(callback_infos)
     graph.graph_id = id_name  # So that it is easy to get to the graphs id through the returned card
+    graph.header_id = header_id  # So easy to get to header of graph through returned card
     return graph

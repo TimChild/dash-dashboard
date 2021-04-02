@@ -5,9 +5,9 @@ general to ANY Dash app, not just Dat analysis. For Dat analysis specific, imple
 from __future__ import annotations
 from deprecation import deprecated
 from dataclasses import dataclass
-from dash_extensions.enrich import Input, Output, State
+from dash_extensions.enrich import Input, Output, State, ServersideOutput
 import threading
-from typing import Optional, List, Union, Callable, Tuple
+from typing import Optional, List, Union, Callable, Tuple, Dict
 import abc
 import dash_bootstrap_components as dbc
 import dash_html_components as html
@@ -16,11 +16,11 @@ from dash_extensions.multipage import PageCollection
 import dash
 import logging
 
-
 logger = logging.getLogger(__name__)
 
 CALLBACK_TYPE = Tuple[str, str]  # All Inputs/Outputs/States require (<id>, <target>)
 LAYOUT_TYPE = Union[dbc.Container, html.Div, dbc.Row, dbc.Col, dbc.Card]
+
 
 # e.g. ('button-test', 'n_clicks')
 
@@ -79,7 +79,7 @@ class CallbackInfo:
     outputs: Union[List[Output], Output]
     inputs: Union[List[Input], Input]
     states: Optional[Union[List[State], State]]
-    serverside_outputs: Optional[Union[List[Output], Output]]
+    serverside_outputs: Optional[Union[List[Output], Output]] = None
 
     def __post_init__(self):
         if isinstance(self.outputs, Output):
@@ -125,7 +125,6 @@ class BaseDashRequirements(abc.ABC):
                       states: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
                       serverside_outputs: Union[List[CALLBACK_TYPE], CALLBACK_TYPE] = None,
                       ):
-
         """
         Helper function for attaching callbacks more easily
 
@@ -144,13 +143,20 @@ class BaseDashRequirements(abc.ABC):
             raise ValueError(f"Can't have no inputs... "
                              f"\n{inputs, outputs, states}")
 
-        inputs, outputs, states = [ensure_list(v) for v in [inputs, outputs, states]]
+        inputs, outputs, states, serverside_outputs = [ensure_list(v) for v in
+                                                       [inputs, outputs, states, serverside_outputs]]
 
         Inputs = [Input(*inp) for inp in inputs]
         Outputs = [Output(*out) for out in outputs]
+        ServerSideOutputs = [ServersideOutput(*out) for out in serverside_outputs]
         States = [State(*s) for s in states]
 
-        callback_info = CallbackInfo(func=func, outputs=Outputs, inputs=Inputs, states=States, serverside_outputs=serverside_outputs)
+        # if len(Outputs) > 0 and len(ServerSideOutputs) > 0:
+        #     raise RuntimeError(f"Got Outputs = {Outputs}, ServerSideOutputs = {ServerSideOutputs}.\n"
+        #                        f"Can't mix Outputs and ServerSideOutputs")
+
+        callback_info = CallbackInfo(func=func, serverside_outputs=ServerSideOutputs, outputs=Outputs,
+                                     inputs=Inputs, states=States)
         self.pending_callbacks.append(callback_info)
 
 
@@ -232,7 +238,7 @@ class BasePageLayout(BaseDashRequirements):
             layout = dbc.NavbarSimple(
                 [dbc.NavItem(dbc.NavLink(page.label, href=page.id)) for page in self.page_collection.pages],
                 brand=self.top_bar_title,
-                )
+            )
         else:
             layout = dbc.NavbarSimple('No pagecollection passed', brand=self.top_bar_title)
         return layout
@@ -273,6 +279,7 @@ class BasePageLayout(BaseDashRequirements):
                 if len(ret) == 1:  # If only outputting to 1 main, then return value not list
                     ret = False
                 return ret
+
             return func
 
         # Main dd selection
@@ -301,10 +308,12 @@ class BasePageLayout(BaseDashRequirements):
         for callback in all_callbacks:
             if any([not isinstance(v, list) for v in [callback.inputs, callback.outputs, callback.states]]):
                 raise RuntimeError(f'Callback contains non list: {callback}')
-            app.callback(*callback.inputs,
-                         *callback.outputs,
-                         *callback.states,
-                         *callback.serverside_outputs)(callback.func)
+            app.callback(
+                *callback.inputs,
+                *callback.serverside_outputs,
+                *callback.outputs,
+                *callback.states,
+            )(callback.func)
 
 
 class BaseMain(BaseDashRequirements):
@@ -342,11 +351,12 @@ class PageInteractiveComponents(abc.ABC):
 
     Intention is to subclass this for each page.
     """
+
     def __init__(self, pending_callbacks: Optional[PendingCallbacks] = None):
         """
         Args:
             pending_callbacks (): Necessary for layout items which include built in callbacks within them (e.g.
-                downloading figure buttons)
+                downloading figure buttons). Only pass in when making callbacks, no need for just getting layout
         """
         self.pending_callbacks = pending_callbacks
         self.dd_main = dcc.Dropdown(id='dd-main')
@@ -366,6 +376,7 @@ class CommonInputCallbacks(abc.ABC):
             func = CommonInputCallbacks.get_callback_func('func_a'),  # 'func_a' defined in callback_names_funcs
         )
     """
+
     @abc.abstractmethod
     def __init__(self, *args):
         """Override to accept all common inputs and store them however you like. Then you can rely on any of this info
@@ -396,7 +407,7 @@ class CommonInputCallbacks(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def callback_names_funcs(self):
+    def callback_names_funcs(self) -> Dict[str, Callable]:
         """Override to return a dict of {<name>: <callback_func>}
         Examples:
             return {
@@ -414,13 +425,15 @@ class CommonInputCallbacks(abc.ABC):
     def get_callback_func(cls, callback_name: str):
         """Generates a callback function which takes all arguments that __init__ takes and will do whatever
         the corresponding function is for "callback_name" in self.callback_names_funcs"""
+
         def callback_func(*args):
             inst = cls(*args)
             callback_options = inst.callback_names_funcs()
             if callback_name in callback_options:
-                return callback_options[callback_name]
+                return callback_options[callback_name]()
             else:
                 raise KeyError(f'{callback_name} not found in {callback_options.keys()}')
+
         return callback_func
 
 

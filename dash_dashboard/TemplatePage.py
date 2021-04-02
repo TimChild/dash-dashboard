@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import logging
 
 from dash_dashboard.base_classes import BasePageLayout, BaseMain, BaseSideBar, PageInteractiveComponents, \
-    CommonInputCallbacks
+    CommonInputCallbacks, PendingCallbacks
 import dash_dashboard.component_defaults as c
 import dash_html_components as html
 from dash_extensions.enrich import MultiplexerTransform  # Dash Extensions has some super useful things!
@@ -17,8 +17,8 @@ page_collection = None  # Gets set when running in multipage mode
 
 
 class Components(PageInteractiveComponents):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, pending_callbacks: Optional[PendingCallbacks] = None):
+        super().__init__(pending_callbacks)
         self.inp_example = c.input_box(id_name='inp-exmaple', val_type='text', debounce=False,
                                        placeholder='Example Input', persistence=False)
         self.div_example = c.div(id_name='div-example')
@@ -38,7 +38,7 @@ class CommonCallback(CommonInputCallbacks):
         Return a dict of {<name>: <callback_func>}
         """
         return {
-            "example": self.example_func(),
+            "example": self.example_func,
         }
 
     def example_func(self):
