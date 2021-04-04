@@ -18,7 +18,15 @@ def default_layout(*args):
     return html.Div([html.Div(id=CONTENT_ID), dcc.Location(id=URL_ID)] + list(args))
 
 
-def get_app(pages) -> DashProxy:
+def get_app(pages: list) -> DashProxy:
+    """
+
+    Args:
+        pages (): List of modules (i.e. the full .py files for each page)
+
+    Returns:
+
+    """
     # Make PageCollection (which handles a lot of the navigation between pages)
     pc = PageCollection(pages=[
         module_to_page(page, id=page.URL_ID, label=page.NAME) for page in pages
