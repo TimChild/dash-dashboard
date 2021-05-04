@@ -5,6 +5,9 @@ import dash_core_components as dcc
 import dash_html_components as html
 import dash_table
 import pandas as pd
+from dataclasses import dataclass
+import json
+import numpy as np
 
 from typing import Optional, List, Tuple, Dict, Any, Union, Callable
 
@@ -81,7 +84,7 @@ def space(height: Optional[str] = None, width: Optional[str] = None) -> html.Div
     return html.Div(style={f'height': height, 'width': width})
 
 
-def store(id_name: str, storage_type: str = 'memory', serverside=True) -> Union[dcc.Store, ServerStore]:
+def store(id_name: str, storage_type: str = 'memory') -> Union[dcc.Store]:
     """For storing data only on clientside (or serverside if used with ServersideOutput from dash-extensions)
 
     Usual Callback Format:
@@ -143,8 +146,8 @@ def dropdown(id_name: str, multi=False, placeholder='Select',
     return dd
 
 
-def toggle(id_name: str, persistence=False) -> dbc.Checklist:
-    tog = dbc.Checklist(id=id_name, options=[{'label': '', 'value': True}], switch=True, persistence=persistence,
+def toggle(id_name: str, label: str = '', persistence=False) -> dbc.Checklist:
+    tog = dbc.Checklist(id=id_name, options=[{'label': label, 'value': True}], switch=True, persistence=persistence,
                         persistence_type='local')
     return tog
 
@@ -276,6 +279,9 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
             dbc.Col(_download_button(graph_id, 'html'), width='auto'),
             dbc.Col(_download_button(graph_id, 'jpg'), width='auto'),
             dbc.Col(_download_button(graph_id, 'svg'), width='auto'),
+            dbc.Col(_download_button(graph_id, 'fig_json'), width='auto'),
+            dbc.Col(_download_button(graph_id, 'data_json'), width='auto'),
+            dbc.Col(_download_button(graph_id, 'igor'), width='auto'),
             dbc.Col(_download_name(graph_id), width='auto'),
         ], no_gutters=True)
         return layout
@@ -283,12 +289,53 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
     def _get_graph_callbacks(graph_id: str) -> List[CallbackInfo]:
         return [_download_callback(graph_id, 'html'),
                 _download_callback(graph_id, 'jpg'),
-                _download_callback(graph_id, 'svg')]
+                _download_callback(graph_id, 'svg'),
+                _download_callback(graph_id, 'fig_json'),
+                _download_callback(graph_id, 'data_json'),
+                _download_callback(graph_id, 'igor'),
+                ]
 
     def _download_callback(graph_id: str, file_type: str) -> CallbackInfo:
         """https://pypi.org/project/dash-extensions/"""
 
         def make_file(n_clicks, fig: dict, filename: str):
+            def data_from_fig(f: go.Figure) -> Dict[str, np.ndarray]:
+                all_data = {}
+                for i, d in enumerate(f.data):
+                    name = getattr(d, 'name', None)
+                    if name is None:
+                        name = f'data{i}'
+                    elif name in all_data.keys():
+                        name = name + f'_{i}'
+                    if 'z' in d:  # Then it is 2D
+                        all_data[name] = getattr(d, 'z')
+                        all_data[name + '_y'] = getattr(d, 'y')
+                    else:
+                        all_data[name] = getattr(d, 'y')
+                    all_data[name + '_x'] = getattr(d, 'x')
+                return all_data
+
+            def itx_from_fig(f: go.Figure) -> str:
+                from igorwriter import IgorWave
+                import io
+                d = data_from_fig(f)
+                waves = []
+                for k in d:
+                    if not k.endswith('_x') and not k.endswith('_y'):
+                        wave = IgorWave(d[k], name=k)
+                        wave.set_datascale(f.layout.yaxis.title.text)
+                        for dim in ['x', 'y']:
+                            if f'{k}_{dim}' in d:
+                                dim_arr = d[f'{k}_{dim}']
+                                wave.set_dimscale('x', dim_arr[0], np.mean(np.diff(dim_arr)),
+                                                                           units=f.layout.xaxis.title.text)
+                        waves.append(wave)
+                buffer = io.StringIO()
+                for wave in waves:
+                    wave.save_itx(buffer, image=True)  # Image = True hopefully makes np and igor match in x/y
+                buffer.seek(0)
+                return buffer.read()
+
             import base64
             if n_clicks:
                 fig = go.Figure(fig)
@@ -297,28 +344,45 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
                     if not filename:
                         filename = 'DashFigure'
 
-                fname = filename + f'.{file_type}'
+                download_info = DownloadInfo(data=None, mtype=None, base64=False, file_extension=file_type)
 
                 if file_type == 'html':
-                    data = fig.to_html()
-                    mtype = 'text/html'
-                    b64 = False
+                    download_info.mtype = 'text/html'
+                    download_info.data = fig.to_html()
                 elif file_type == 'jpg':
-                    data = base64.b64encode(fig.to_image(format='jpg')).decode()
-                    mtype = 'image/jpg'
-                    b64 = True
+                    download_info.data = base64.b64encode(fig.to_image(format='jpg')).decode()
+                    download_info.mtype = 'image/jpg'
+                    download_info.base64 = True
                 elif file_type == 'svg':
-                    data = base64.b64encode(fig.to_image(format='svg')).decode()
-                    mtype = 'image/svg+xml'
-                    b64 = True
+                    download_info.data = base64.b64encode(fig.to_image(format='svg')).decode()
+                    download_info.mtype = 'image/svg+xml'
+                    download_info.base64 = True
+                elif file_type == 'fig_json':
+                    filename = 'Figure_'+filename
+                    download_info.data = fig.to_json()
+                    download_info.mtype = 'application/json'
+                    download_info.file_extension = 'json'
+                elif file_type == 'data_json':
+                    filename = 'Data_'+filename
+                    data = data_from_fig(fig)
+                    data_json = json.dumps(data, default=lambda arr: arr.tolist())
+                    download_info.data = data_json
+                    download_info.mtype = 'application/json'
+                    download_info.file_extension = 'json'
+                elif file_type == 'igor':
+                    download_info.data = itx_from_fig(fig)
+                    download_info.mtype = 'application/octet-stream'
+                    download_info.file_extension = 'itx'
                 else:
                     raise ValueError(f'{file_type} not supported')
 
-                return dict(content=data, filename=fname, mimetype=mtype, base64=b64)
+                fname = filename + f'.{download_info.file_extension}'
+                return dict(content=download_info.data, filename=fname, mimetype=download_info.mtype,
+                            base64=download_info.base64)
             else:
                 raise PreventUpdate
 
-        if file_type not in ['html', 'jpg', 'svg']:
+        if file_type not in ['html', 'jpg', 'svg', 'fig_json', 'data_json', 'igor']:
             raise ValueError(f'{file_type} not supported')
 
         dl_id = f'{graph_id}_download-{file_type}'  # Download extension
@@ -330,7 +394,7 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         return callback_info
 
     def _download_button(graph_id: str, file_type: str):
-        if file_type not in ['html', 'jpg', 'svg']:
+        if file_type not in ['html', 'jpg', 'svg', 'fig_json', 'data_json', 'igor']:
             raise ValueError(f'{file_type} not supported')
         button = [dbc.Button(f'Download {file_type.upper()}', id=f'{graph_id}_but-{file_type}-download'),
                   Download(id=f'{graph_id}_download-{file_type}')]
@@ -348,7 +412,7 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
         ], justify='between')
     )
 
-    graph_body = dcc.Graph(id=id_name)
+    graph_body = dcc.Graph(id=id_name, config=dict(editable=True))  # editable allows changing text and labels
     graph = dbc.Card([
         header_layout, graph_body
     ])
@@ -358,3 +422,13 @@ def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[Pend
     graph.graph_id = id_name  # So that it is easy to get to the graphs id through the returned card
     graph.header_id = header_id  # So easy to get to header of graph through returned card
     return graph
+
+
+@dataclass
+class DownloadInfo:
+    data: Optional[Any]  # The data to be sent for download
+    mtype: Optional[str]  # Mimetype of data (google to find them)
+    base64: bool  # Whether this is base64 info, necessary for dash-extensions to know
+    file_extension: str  # Extension to filename
+
+
