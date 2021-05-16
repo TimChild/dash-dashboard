@@ -3,11 +3,14 @@ from typing import List, Tuple, Dict, Optional, Any, Callable
 from dataclasses import dataclass
 import logging
 
+import dash_html_components as html
+import dash_bootstrap_components as dbc
+import dash_core_components as dcc
+from dash_extensions.enrich import MultiplexerTransform  # Dash Extensions has some super useful things!
+
+import dash_dashboard.component_defaults as ccs
 from dash_dashboard.base_classes import BasePageLayout, BaseMain, BaseSideBar, PageInteractiveComponents, \
     CommonInputCallbacks, PendingCallbacks
-import dash_dashboard.component_defaults as c
-import dash_html_components as html
-from dash_extensions.enrich import MultiplexerTransform  # Dash Extensions has some super useful things!
 
 logger = logging.getLogger(__name__)
 
@@ -19,9 +22,9 @@ page_collection = None  # Gets set when running in multipage mode
 class Components(PageInteractiveComponents):
     def __init__(self, pending_callbacks: Optional[PendingCallbacks] = None):
         super().__init__(pending_callbacks)
-        self.inp_example = c.input_box(id_name='inp-exmaple', val_type='text', debounce=False,
-                                       placeholder='Example Input', persistence=False)
-        self.div_example = c.div(id_name='div-example')
+        self.inp_example = ccs.input_box(id_name='inp-exmaple', val_type='text', debounce=False,
+                                         placeholder='Example Input', persistence=False)
+        self.div_example = ccs.div(id_name='div-example')
 
 
 # A reminder that this is helpful for making many callbacks which have similar inputs
@@ -117,7 +120,7 @@ def layout(*args):  # *args only because dash_extensions passes in the page name
 
 
 def callbacks(app):
-    inst = TemplateLayout(Components())
+    inst = TemplateLayout(Components(pending_callbacks=PendingCallbacks()))
     inst.page_collection = page_collection
     inst.layout()  # Most callbacks are generated while running layout
     return inst.run_all_callbacks(app)

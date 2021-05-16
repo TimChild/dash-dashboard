@@ -84,7 +84,7 @@ def space(height: Optional[str] = None, width: Optional[str] = None) -> html.Div
     return html.Div(style={f'height': height, 'width': width})
 
 
-def store(id_name: str, storage_type: str = 'memory') -> Union[dcc.Store]:
+def store(id_name: str, storage_type: str = 'memory') -> dcc.Store:
     """For storing data only on clientside (or serverside if used with ServersideOutput from dash-extensions)
 
     Usual Callback Format:
@@ -263,6 +263,7 @@ def date_picker_range(id_name: str, **kwargs) -> dcc.DatePickerRange:
 
 def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[PendingCallbacks] = None) -> dbc.Card:
     """
+    A graph in a Card component with download buttons.
 
     Args:
         id_name (): id for component (all extra components in here derive from this as well)
@@ -430,5 +431,3 @@ class DownloadInfo:
     mtype: Optional[str]  # Mimetype of data (google to find them)
     base64: bool  # Whether this is base64 info, necessary for dash-extensions to know
     file_extension: str  # Extension to filename
-
-
