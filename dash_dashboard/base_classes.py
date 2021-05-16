@@ -299,7 +299,7 @@ class BasePageLayout(BaseDashRequirements):
         if (p := self.components.pending_callbacks) is not None:
             all_callbacks.extend(p)
         else:
-            logger.warning(f'No pending_callbacks for page Components. {p}')
+            logger.warning(f'No pending_callbacks in self.components.pending_callbacks')
 
         for main in self.mains:
             main.set_callbacks()
