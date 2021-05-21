@@ -172,17 +172,29 @@ class BasePageLayout(BaseDashRequirements):
 
     def __init__(self, page_components: PageInteractiveComponents):
         super().__init__(page_components)
-        self.mains = self.get_mains()
+        # self.mains = self.get_mains()
+        self.main = self.get_main()
         self.sidebar = self.get_sidebar()
         self.page_collection: PageCollection = None
 
+    # @abc.abstractmethod
+    # def get_mains(self) -> List[BaseMain]:
+    #     """
+    #     Override to return list of BaseMain areas to use in Page
+    #
+    #     Note: Pass in self.components to initialization so that the same components are shared
+    #     Examples:
+    #     """
+    #     raise NotImplementedError
+
     @abc.abstractmethod
-    def get_mains(self) -> List[BaseMain]:
+    def get_main(self) -> BaseMain:
         """
-        Override to return list of BaseMain areas to use in Page
+        Override to return a BaseMain area to use in Page
 
         Note: Pass in self.components to initialization so that the same components are shared
         Examples:
+            return TestMain(self.components)  # where TestMain is a subclass of BaseMain
         """
         raise NotImplementedError
 
@@ -193,7 +205,7 @@ class BasePageLayout(BaseDashRequirements):
 
         Note: pass in self.components for initialization so that the same components are shared
         Examples:
-            return TestSideBar()  # where TestSideBar is a subclass of SideBar
+            return TestSideBar(self.components)  # where TestSideBar is a subclass of SideBar
         """
         raise NotImplementedError
 
@@ -204,10 +216,13 @@ class BasePageLayout(BaseDashRequirements):
         pages.
         """
         logger.debug(f'Layout called on {self}: args = {args}, kwargs = {kwargs}')
-        self.pending_callbacks = PendingCallbacks()  # Reset pending callbacks for each load of layout
+
+        # Reset pending callbacks for each load of layout
+        self.pending_callbacks = PendingCallbacks()
         self.sidebar.pending_callbacks = PendingCallbacks()
-        for main in self.mains:
-            main.pending_callbacks = PendingCallbacks()
+        # for main in self.mains:
+        #     main.pending_callbacks = PendingCallbacks()
+        self.main.pending_callbacks = PendingCallbacks()
 
         layout = dbc.Container(fluid=True, className='p-0', children=[
             dbc.Row(
@@ -254,7 +269,8 @@ class BasePageLayout(BaseDashRequirements):
         Makes the main area layout based on self.get_mains()
         """
         # A basic layout which enables showing only one "main" part at a time
-        layout = html.Div([html.Div(main.layout(), id=main.name) for main in self.mains])
+        # layout = html.Div([html.Div(main.layout(), id=main.name) for main in self.mains])
+        layout = self.main.layout()
         return layout
 
     def side_bar_layout(self):
@@ -266,47 +282,51 @@ class BasePageLayout(BaseDashRequirements):
         return self.sidebar.layout()
 
     def set_callbacks(self):
-        def _main_dd_callback_func() -> Callable:
-            opts = [d['value'] for d in self.components.dd_main.options]
-
-            def func(inp):
-                outs = {k: True for k in opts}
-                if inp is not None and inp in outs:
-                    outs[inp] = False  # Set selected page to False (not hidden)
-                else:
-                    outs[next(iter(outs))] = False  # Otherwise set first page to False (not hidden)
-                ret = list(outs.values())
-                if len(ret) == 1:  # If only outputting to 1 main, then return value not list
-                    ret = False
-                return ret
-
-            return func
-
-        # Main dd selection
-        # First add some more initialization info
-        labels = [main.name for main in self.mains]
-        self.components.dd_main.options = [{'label': label, 'value': label} for label in labels]
-        self.components.dd_main.value = labels[0]
-        # Then make callback
-        self.make_callback(outputs=[(id_, 'hidden') for id_ in labels], inputs=(self.components.dd_main.id, 'value'),
-                           func=_main_dd_callback_func())
+        # def _main_dd_callback_func() -> Callable:
+        #     opts = [d['value'] for d in self.components.dd_main.options]
+        #
+        #     def func(inp):
+        #         outs = {k: True for k in opts}
+        #         if inp is not None and inp in outs:
+        #             outs[inp] = False  # Set selected page to False (not hidden)
+        #         else:
+        #             outs[next(iter(outs))] = False  # Otherwise set first page to False (not hidden)
+        #         ret = list(outs.values())
+        #         if len(ret) == 1:  # If only outputting to 1 main, then return value not list
+        #             ret = False
+        #         return ret
+        #
+        #     return func
+        #
+        # # Main dd selection
+        # # First add some more initialization info
+        # labels = [main.name for main in self.mains]
+        # self.components.dd_main.options = [{'label': label, 'value': label} for label in labels]
+        # self.components.dd_main.value = labels[0]
+        # # Then make callback
+        # self.make_callback(outputs=[(id_, 'hidden') for id_ in labels], inputs=(self.components.dd_main.id, 'value'),
+        #                    func=_main_dd_callback_func())
+        pass
 
     def run_all_callbacks(self, app: dash.Dash):
         """This is the only place where callbacks should be run, and will only be run ONCE on initialization of app"""
         self.set_callbacks()
         self.sidebar.set_callbacks()
-        all_callbacks = self.pending_callbacks + self.sidebar.pending_callbacks
+        self.main.set_callbacks()
+        # all_callbacks = self.pending_callbacks + self.sidebar.pending_callbacks
+        all_callbacks = self.pending_callbacks + self.sidebar.pending_callbacks + self.main.pending_callbacks
+
         if (p := self.components.pending_callbacks) is not None:
             all_callbacks.extend(p)
         else:
-            logger.warning(f'No pending_callbacks for page Components. {p}')
+            logger.info(f'No pending_callbacks for page Components. {p}')
 
-        for main in self.mains:
-            main.set_callbacks()
-            all_callbacks.extend(main.pending_callbacks)
+        # for main in self.mains:
+        #     main.set_callbacks()
+        #     all_callbacks.extend(main.pending_callbacks)
 
         for callback in all_callbacks:
-            if any([not isinstance(v, list) for v in [callback.inputs, callback.outputs, callback.states]]):
+            if any([not isinstance(v, list) for v in [callback.inputs, callback.outputs, callback.states, callback.serverside_outputs]]):
                 raise RuntimeError(f'Callback contains non list: {callback}')
             app.callback(
                 *callback.inputs,
@@ -359,7 +379,7 @@ class PageInteractiveComponents(abc.ABC):
                 downloading figure buttons). Only pass in when making callbacks, no need for just getting layout
         """
         self.pending_callbacks = pending_callbacks
-        self.dd_main = dcc.Dropdown(id='dd-main')
+        # self.dd_main = dcc.Dropdown(id='dd-main')
 
 
 class CommonInputCallbacks(abc.ABC):
@@ -459,13 +479,18 @@ class BaseSideBar(BaseDashRequirements):
         return "BaseSidebar"
 
     def layout(self):
-        """Return the full layout of sidebar to be used"""
-        layout = html.Div([
-            self.input_wrapper(text='This adds a label', children=[
-                self.input_box(id_name='inp-number', placeholder='Choose Number', val_type='number', autoFocus=True)
-            ]),
-        ])
-        return layout
+        """Override to return the full layout of sidebar to be used
+
+        Examples:
+            layout = html.Div([
+                self.input_wrapper(text='This adds a label', children=[
+                    ccs.input_box(id_name='inp-number', placeholder='Choose Number', val_type='number', autoFocus=True)
+                ]),
+            ])
+
+            where ccs is dash_dashboard.component_defaults
+        """
+        return html.Div()
 
     @abc.abstractmethod
     def set_callbacks(self):

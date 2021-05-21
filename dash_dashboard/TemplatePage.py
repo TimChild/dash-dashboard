@@ -64,8 +64,11 @@ class TemplateLayout(BasePageLayout):
         super().__init__(page_components=components)
         self.components = components
 
-    def get_mains(self) -> List[TemplateMain]:
-        return [TemplateMain(self.components), ]
+    # def get_mains(self) -> List[TemplateMain]:
+    #     return [TemplateMain(self.components), ]
+
+    def get_main(self) -> TemplateMain:
+        return TemplateMain(self.components)
 
     def get_sidebar(self) -> BaseSideBar:
         return TemplateSidebar(self.components)
@@ -101,7 +104,6 @@ class TemplateSidebar(BaseSideBar):
 
     def layout(self):
         lyt = html.Div([
-            self.components.dd_main,
             self.components.inp_example,
         ])
         return lyt
