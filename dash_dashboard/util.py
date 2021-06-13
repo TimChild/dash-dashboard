@@ -27,6 +27,23 @@ def list_to_options(options_list: List[str]) -> List[Dict[str, str]]:
     return [{'label': k, 'value': k} for k in options_list]
 
 
+def new_options_keep_old_selection(new_options_list, current_selection) -> Tuple[List[Dict[str, str]], str]:
+    """
+    Converts a simple list of new options and the current selection values into a list of dash options and any still
+    valid selections
+    Args:
+        new_options_list (): Simple list of new options to show in dropdown
+        current_selection (): Currently selected values in dropdown for which only values which are still relevant
+            will be returned
+
+    Returns:
+        dash style options, dash style values (which are still valid)
+    """
+    val = _valid_values(new_options_list, current_selection)
+    opts = list_to_options(new_options_list)
+    return opts, val
+
+
 def _valid_values(options_list: List[str], current: Union[str, List[str]], default_to_first=True) -> Union[str, List[str]]:
     """
     Returns the list of current values which exist in the options_list. Useful for only keeping current values which
@@ -57,20 +74,4 @@ def _valid_values(options_list: List[str], current: Union[str, List[str]], defau
             values = ''
     return values
 
-
-def new_options_keep_old_selection(new_options_list, current_selection) -> Tuple[List[Dict[str, str]], str]:
-    """
-    Converts a simple list of new options and the current selection values into a list of dash options and any still
-    valid selections
-    Args:
-        new_options_list (): Simple list of new options to show in dropdown
-        current_selection (): Currently selected values in dropdown for which only values which are still relevant
-            will be returned
-
-    Returns:
-        dash style options, dash style values (which are still valid)
-    """
-    val = _valid_values(new_options_list, current_selection)
-    opts = list_to_options(new_options_list)
-    return opts, val
 
