@@ -30,12 +30,14 @@ class PageInfo:
         self.page_id = self.page_id if self.page_id else self.page_name
 
 
-def run_app(app: dash.Dash, debug: bool = True, debug_port: int = 8051, real_port: int = None, threaded=True):
+def run_app(app: dash.Dash, debug: bool = True, debug_port: int = 8050, real_port: int = None, threaded=True):
     """Handles running dash app with reasonable settings for debug or real"""
-    if isinstance(app, DashProxy):
+    if isinstance(app, DashProxy):  # turn into a dash.Dash app (otherwise single outputs get turned into lists when they shouldn't)
         real_app = dash.Dash(__name__, plugins=[MyFlexibleCallbacks()])
-        register_dash_proxy_callbacks_to_app(app, real_app)  # Otherwise single outputs get turned into lists when they shouldn't
-        real_app.layout = app._layout_value()
+        real_app.index_string = app.index_string  # Copy across any inline CSS style added by dash_labs plugins
+        real_app.config.external_stylesheets = app.config.external_stylesheets  # Copy across external stylesheets
+        register_dash_proxy_callbacks_to_app(app, real_app)  # Copy across callbacks
+        real_app.layout = app._layout_value()  # Copy across layout
         app = real_app
 
     # Resizes things better based on actual device width rather than just pixels (good for mobile)
