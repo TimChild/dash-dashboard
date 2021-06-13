@@ -1,15 +1,21 @@
 from __future__ import annotations
-from typing import Optional
+from typing import Optional, Union, List, Tuple, Dict
 
+import dash
+import dash_labs as dl
+from dash_labs import Input, Output, State
 from dash_extensions.enrich import DashProxy
-from dash_dashboard.dash_labs_extensions_overrides import MyFlexibleCallbacks
 
+from dash_dashboard.dash_labs_extensions_overrides import MyFlexibleCallbacks
 from dash_dashboard.run_app import PageInfo
 
 
 def make_app(app: Optional[DashProxy] = None):
     if app is None:
-        app = DashProxy(transforms=[], plugins=[MyFlexibleCallbacks()])
+        app = dash.Dash(plugins=[MyFlexibleCallbacks()])
+        # app = DashProxy(transforms=[], plugins=[MyFlexibleCallbacks()])  # Use this to use additional dash_extensions
+        # Note: Do NOT use a PrefixID transform here (it doesn't work with the dash_labs callback/template system)
+        # PrefixIDs are handled by multipage
 
     """
     Make the app (i.e. all layout and app.callback() normal stuff)
@@ -40,6 +46,7 @@ page_info = PageInfo(
 
 
 if __name__ == '__main__':
+    from dash_dashboard.run_app import run_app
     page_app = make_app()
-    page_app.run_server(debug=True)
+    run_app(page_app, debug=True, debug_port=8050, threaded=True)
 
