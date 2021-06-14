@@ -2,24 +2,15 @@
 A bunch of functions which return dash components with some additional defaults which are generally useful
 """
 from __future__ import annotations
-import abc
 import dash_bootstrap_components as dbc
 import dash_core_components as dcc
 import dash_html_components as html
 import dash_labs as dl
 import dash_table
 import pandas as pd
-from dataclasses import dataclass
-import json
-import numpy as np
+from dash_labs.util import build_id
 
 from typing import Optional, List, Tuple, Dict, Any, Union, Callable
-
-from dash.dependencies import Output, Input, State
-from dash.exceptions import PreventUpdate
-from dash_extensions import Download
-from dash_extensions.snippets import send_file
-from plotly import graph_objects as go
 
 
 def space(height: Optional[str] = None, width: Optional[str] = None) -> html.Div:
@@ -27,7 +18,7 @@ def space(height: Optional[str] = None, width: Optional[str] = None) -> html.Div
     return html.Div(style={f'height': height, 'width': width})
 
 
-def store(id_name: str, storage_type: str = 'memory') -> dcc.Store:
+def store(storage_type: str = 'memory', id: Optional[str] = None) -> dcc.Store:
     """For storing data only on clientside (or serverside if used with ServersideOutput from dash-extensions)
 
     Usual Callback Format:
@@ -35,36 +26,39 @@ def store(id_name: str, storage_type: str = 'memory') -> dcc.Store:
         'clear_data': set True to clear data
 
     Args:
-        id_name:
         storage_type: 'memory' = resets on page refresh, 'session' = resets on browser reload, 'local' = local memory
+        id:  Optional id to use
 
     """
-    return dcc.Store(id=id_name, storage_type=storage_type)
+    id = id if id else build_id('store')
+    return dcc.Store(id=id, storage_type=storage_type)
 
 
-def input_box(id_name: Optional[str] = None, val_type='number', debounce=True,
-              placeholder: str = '', persistence=False,
+def input_box(val_type='number', debounce=True,
+              placeholder: str = '', persistence=False, id: str = None,
               **kwargs) -> dbc.Input:
     """
 
     Args:
-        id_name ():
         val_type (): "text", 'number', 'password', 'email', 'range', 'search', 'tel', 'url', 'hidden', None
         debounce ():
         placeholder ():
         persistence ():
+        id (): Optional id of component
         **kwargs ():
 
     Returns:
 
     """
-    inp = dbc.Input(id=id_name, type=val_type, placeholder=placeholder, debounce=debounce, **kwargs,
+    id = id if id else build_id('input_box')
+    inp = dbc.Input(id=id, type=val_type, placeholder=placeholder, debounce=debounce, **kwargs,
                     persistence=persistence, persistence_type='local')
+
     return inp
 
 
-def dropdown(id_name: str, multi=False, placeholder='Select',
-             persistence=False) -> Union[dbc.Select, dcc.Dropdown]:
+def dropdown(multi=False, placeholder='Select',
+             persistence=False, id: Optional[str] = None) -> Union[dbc.Select, dcc.Dropdown]:
     """
     Either a single select or multi selectable dropdown.
 
@@ -72,59 +66,99 @@ def dropdown(id_name: str, multi=False, placeholder='Select',
         'options': [{'label': <name>, 'value', <val>}]
 
     Args:
-        id_name ():
         multi ():  Whether multiple selections can be made
         placeholder ():
         persistence ():
+        id (): Optional id of component
 
     Returns:
 
     """
+    id = id if id else build_id('dropdown')
+
     if multi is False:
-        dd = dbc.Select(id=id_name, placeholder=placeholder, persistence=persistence,
+        dd = dbc.Select(id=id, placeholder=placeholder, persistence=persistence,
                         persistence_type='local')
     else:
-        dd = dcc.Dropdown(id=id_name, placeholder=placeholder, style={'width': '80%'}, multi=True,
+       dd = dcc.Dropdown(id=id, placeholder=placeholder, style={'width': '80%'}, multi=True,
                           persistence=persistence, persistence_type='local')
     return dd
 
 
-def toggle(id_name: str, label: str = '', persistence=False) -> dbc.Checklist:
-    tog = dbc.Checklist(id=id_name, options=[{'label': label, 'value': True}], switch=True, persistence=persistence,
-                        persistence_type='local')
-    return tog
-
-
-def slider(id_name: str, updatemode='mouseup', persistence=False) -> dcc.Slider:
+def toggle(label: str = '', persistence=False, id: Optional[str] = None) -> dbc.Checklist:
     """
 
     Args:
-        id_name ():
-        updatemode (): 'mouseup' or 'drag'
+        label ():
         persistence ():
+        id (): Optional id of component
 
     Returns:
 
     """
-    return dcc.Slider(id=id_name, updatemode=updatemode, persistence=persistence,
+    id = id if id else build_id('toggle')
+
+    tog = dbc.Checklist(id=id, options=[{'label': label, 'value': True}], switch=True, persistence=persistence,
+                        persistence_type='local')
+    return tog
+
+
+def slider(updatemode='mouseup', persistence=False, id: Optional[str] = None) -> dcc.Slider:
+    """
+
+    Args:
+        updatemode (): 'mouseup' or 'drag'
+        persistence ():
+        id (): Optional id of component
+
+    Returns:
+
+    """
+    id = id if id else build_id('slider')
+
+    return dcc.Slider(id=id, updatemode=updatemode, persistence=persistence,
                       persistence_type='local')
 
 
-def range_slider(id_name: str, updatemode='mouseup', persistence=False) -> dcc.RangeSlider:
-    return dcc.RangeSlider(id=id_name, updatemode=updatemode,
+def range_slider(updatemode='mouseup', persistence=False, id: Optional[str] = None) -> dcc.RangeSlider:
+    """
+
+    Args:
+        updatemode ():
+        persistence ():
+        id (): Optional id of component
+
+    Returns:
+
+    """
+    id = id if id else build_id('range_slider')
+
+    return dcc.RangeSlider(id=id, updatemode=updatemode,
                            persistence=persistence, persistence_type='local')
 
 
-def checklist(id_name: str,
-              options: Optional[List[dict]] = None, persistence=False) -> dbc.Checklist:
+def checklist(
+              options: Optional[List[dict]] = None, persistence=False, id: Optional[str] = None) -> dbc.Checklist:
+    """
+
+    Args:
+        options ():
+        persistence ():
+        id (): Optional id of component
+
+    Returns:
+
+    """
+    id = id if id else build_id('checklist')
+
     if options is None:
         options = []
-    checklist = dbc.Checklist(id=id_name, options=options, switch=False, persistence=persistence,
+    checklist = dbc.Checklist(id=id, options=options, switch=False, persistence=persistence,
                               persistence_type='local')
     return checklist
 
 
-def table(id_name: str, dataframe: Optional[pd.Dataframe] = None,
+def table(dataframe: Optional[pd.Dataframe] = None, id: Optional[str] = None,
           **kwargs) -> dbc.Table:
     """
     https://dash.plotly.com/datatable
@@ -134,24 +168,25 @@ def table(id_name: str, dataframe: Optional[pd.Dataframe] = None,
         'data': df.to_dict('records')
 
     Args:
-        id_name ():
         dataframe ():
+        id (): Optional id of component
         **kwargs ():
 
     Returns:
-
     """
+    id = id if id else build_id('table')
+
     # table = dbc.Table(dataframe, id=self.id(id_name), striped=True, bordered=True, hover=True)
     if dataframe is not None:
         cols = [{'name': n, 'id': n} for n in dataframe.columns()]
         data = dataframe.to_dict('records')
     else:
         cols, data = None, None
-    table_component = dash_table.DataTable(id=id_name, columns=cols, data=data, **kwargs)
+    table_component = dash_table.DataTable(id=id, columns=cols, data=data, **kwargs)
     return table_component
 
 
-def button(id_name: str, text: str, color='secondary', spinner: Optional[dbc.Spinner] = None) -> dbc.Button:
+def button(text: str, color='secondary', spinner: Optional[dbc.Spinner] = None, id: Optional[str] = None) -> dbc.Button:
     """
     Makes a button which shows <text> and if <spinner> is passed will also show a loading spinner
 
@@ -159,48 +194,85 @@ def button(id_name: str, text: str, color='secondary', spinner: Optional[dbc.Spi
     (i.e. an empty div that waits for an update)
 
     Args:
-        id_name ():
         text ():
         color ():
         spinner ():
+        id (): Optional id of component
 
     Returns:
 
     """
+    id = id if id else build_id('button')
+
     if spinner:
         children = [spinner, text]
     else:
         children = text
-    return dbc.Button(children, id=id_name, color=color)
+    return dbc.Button(children, id=id, color=color)
 
 
-def div(id_name: str, **kwargs) -> html.Div:
-    d = html.Div(id=id_name, **kwargs)
+def div(id: Optional[str] = None, **kwargs) -> html.Div:
+    """
+
+    Args:
+        id (): Optional id of component
+        **kwargs ():
+
+    Returns:
+
+    """
+    id = id if id else build_id('div')
+
+    d = html.Div(id=id, **kwargs)
     return d
 
 
-def collapse(id_name: str) -> dbc.Collapse:
+def collapse(id: Optional[str] = None) -> dbc.Collapse:
     """
     Usual callbacks format:
         'is_open': bool
 
     Args:
-        id_name ():
+        id (): Optional id of component
 
     Returns:
 
     """
-    c = dbc.Collapse(id=id_name)
+    id = id if id else build_id('collapse')
+
+    c = dbc.Collapse(id=id)
     return c
 
 
-def date_picker_single(id_name: str, **kwargs) -> dcc.DatePickerSingle:
-    dps = dcc.DatePickerSingle(id=id_name, **kwargs, )
+def date_picker_single(id: Optional[str] = None, **kwargs) -> dcc.DatePickerSingle:
+    """
+
+    Args:
+        id (): Optional id of component
+        **kwargs ():
+
+    Returns:
+
+    """
+    id = id if id else build_id('date_picker_single')
+
+    dps = dcc.DatePickerSingle(id=id, **kwargs, )
     return dps
 
 
-def date_picker_range(id_name: str, **kwargs) -> dcc.DatePickerRange:
-    dpr = dcc.DatePickerRange(id=id_name, **kwargs)
+def date_picker_range(id: Optional[str] = None, **kwargs) -> dcc.DatePickerRange:
+    """
+
+    Args:
+        id (): Optional id of component
+        **kwargs ():
+
+    Returns:
+
+    """
+    id = id if id else build_id('date_picker_range')
+
+    dpr = dcc.DatePickerRange(id=id, **kwargs)
     return dpr
 
 
@@ -210,17 +282,24 @@ class GraphCard(dbc.Card):
 
 
 def graph_area(graph_header: str = 'Not set', id: str = None) -> GraphCard:
-    """Makes a nice looking graph with a title"""
-    id_ = id if id is not None else dl.util.build_id('graph')
+    """
+    Makes a nice looking graph with a title
+    Args:
+        graph_header ():
+        id (): Optional id of component
+
+    Returns:
+
+    """
+    id = id if id is not None else dl.util.build_id('graph')
     header_id = dl.util.build_id('graph_header')
     layout = GraphCard([
         dbc.CardHeader(html.H3(id=header_id, children=graph_header)),
-        dbc.CardBody(dcc.Graph(id=id_))
+        dbc.CardBody(dcc.Graph(id=id))
     ])
-    layout.graph_id = id_
+    layout.graph_id = id
     layout.header_id = header_id
     return layout
-
 
 # def graph_area(id_name: str, graph_header: str, pending_callbacks: Optional[PendingCallbacks] = None) -> dbc.Card:
 #     """

@@ -5,14 +5,19 @@ import dash
 import dash_labs as dl
 from dash_labs import Input, Output, State
 from dash_extensions.enrich import DashProxy
+import dash_html_components as html
+import dash_core_components as dcc
+import dash_bootstrap_components as dbc
 
 from dash_dashboard.dash_labs_extensions_overrides import MyFlexibleCallbacks
 from dash_dashboard.run_app import PageInfo
+import dash_dashboard.component_defaults as cds
+import dash_dashboard as dd  # Can get to all dash_dashboard stuff from here e.g. dd.util.get_trig_id()
 
 
 def make_app(app: Optional[DashProxy] = None):
     if app is None:
-        app = dash.Dash(plugins=[MyFlexibleCallbacks()])
+        app = dash.Dash(plugins=[MyFlexibleCallbacks()], external_stylesheets=[dbc.themes.FLATLY])
         # app = DashProxy(transforms=[], plugins=[MyFlexibleCallbacks()])  # Use this to use additional dash_extensions
         # Note: Do NOT use a PrefixID transform here (it doesn't work with the dash_labs callback/template system)
         # PrefixIDs are handled by multipage
